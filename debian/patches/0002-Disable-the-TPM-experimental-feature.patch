@@ -1,0 +1,100 @@
+From: Faidon Liambotis <paravoid@debian.org>
+Date: Wed, 27 Dec 2023 23:49:50 +0200
+Subject: Disable the TPM experimental feature
+
+It needs the Go-Attestation stack, which is not in Debian and is not
+trivial to package.
+---
+ cmd/sbctl/enroll-keys.go |  2 ++
+ tpm.go                   | 49 ++++--------------------------------------------
+ 2 files changed, 6 insertions(+), 45 deletions(-)
+
+diff --git a/cmd/sbctl/enroll-keys.go b/cmd/sbctl/enroll-keys.go
+index e81c77a..8ca5609 100644
+--- a/cmd/sbctl/enroll-keys.go
++++ b/cmd/sbctl/enroll-keys.go
+@@ -133,6 +133,8 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
+ 	for _, oem := range oems {
+ 		switch oem {
+ 		case "tpm-eventlog":
++			return fmt.Errorf("Temporarily disabled in the Debian package.")
++
+ 			logging.Print("\nWith checksums from the TPM Eventlog...")
+ 			eventlogDB, err := sbctl.GetEventlogChecksums(systemEventlog)
+ 			if err != nil {
+diff --git a/tpm.go b/tpm.go
+index c3698b3..b387e05 100644
+--- a/tpm.go
++++ b/tpm.go
+@@ -2,12 +2,9 @@ package sbctl
+ 
+ import (
+ 	"errors"
+-	"os"
+ 
+ 	"github.com/foxboron/go-uefi/efi/signature"
+ 	"github.com/foxboron/go-uefi/efi/util"
+-	"github.com/foxboron/sbctl/fs"
+-	"github.com/google/go-attestation/attest"
+ )
+ 
+ var (
+@@ -19,54 +16,16 @@ var (
+ 	eventlogGUID = *util.StringToGUID("4f52704f-494d-41736e-6e6f79696e6721")
+ )
+ 
+-func GetEventlogEvents(eventlog string) ([]attest.Event, error) {
+-	if _, err := fs.Fs.Stat(eventlog); err != nil {
+-		if errors.Is(err, os.ErrNotExist) {
+-			return nil, ErrNoEventlog
+-		}
+-		return nil, err
+-	}
+-	b, err := fs.ReadFile(eventlog)
+-	if err != nil {
+-		return nil, err
+-	}
+-	log, err := attest.ParseEventLog(b)
+-	if err != nil {
+-		return nil, err
+-	}
+-	// TODO: Hardcoded. Should probably make this dynamic
+-	return log.Events(attest.HashSHA256), nil
++func GetEventlogEvents(eventlog string) ([]string, error) {
++	return nil, ErrNoEventlog
+ }
+ 
+ func CheckEventlogOprom(eventlog string) error {
+-	events, err := GetEventlogEvents(eventlog)
+-	if err != nil {
+-		return err
+-	}
+-	for _, event := range events {
+-		switch event.Type.String() {
+-		case "EV_EFI_BOOT_SERVICES_DRIVER":
+-			return ErrOprom
+-		}
+-	}
+-	return nil
++	return ErrNoEventlog
+ }
+ 
+ func GetEventlogChecksums(eventlog string) (*signature.SignatureDatabase, error) {
+-	events, err := GetEventlogEvents(eventlog)
+-	if err != nil {
+-		return nil, err
+-	}
+-	sigdb := signature.NewSignatureDatabase()
+-	for _, event := range events {
+-		switch event.Type.String() {
+-		case "EV_EFI_BOOT_SERVICES_DRIVER":
+-			if err = sigdb.Append(signature.CERT_SHA256_GUID, eventlogGUID, event.Digest); err != nil {
+-				return nil, err
+-			}
+-		}
+-	}
+-	return sigdb, nil
++	return nil, ErrNoEventlog
+ }
+ 
+ func DetectTPMEventlog(sb *signature.SignatureDatabase) bool {

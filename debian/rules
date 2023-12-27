@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+# * "tests" requires github.com/anatol/vmtest which would not be very practical
+#   to run at build time.
+export DH_GOLANG_EXCLUDES := tests/
+
+export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
+
+%:
+	dh $@ --builddirectory=_build --buildsystem=golang --with=golang
+
+override_dh_auto_install:
+	dh_auto_install -- --no-source
+
+override_dh_auto_test:
