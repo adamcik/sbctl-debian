@@ -4,3 +4,6 @@ releases/*
 docs/*.8
 rootfs*
 bzImage
+
+/.pc/
+/_build/
