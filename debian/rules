@@ -11,6 +11,10 @@ export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
 
 execute_after_dh_auto_build:
 	make docs/sbctl.8
+	# from Makefile, but with _build/bin/sbctl instead, and proper perms
+	_build/bin/sbctl completion bash | install -m644 -D /dev/stdin contrib/completions/bash-completion/completions/sbctl
+	_build/bin/sbctl completion zsh | install -m644 -D /dev/stdin contrib/completions/zsh/site-functions/_sbctl
+	_build/bin/sbctl completion fish | install -m644 -D /dev/stdin contrib/completions/fish/vendor_completions.d/sbctl.fish
 
 override_dh_auto_install:
 	dh_auto_install -- --no-source
@@ -18,4 +22,5 @@ override_dh_auto_install:
 override_dh_auto_test:
 
 execute_after_dh_auto_clean:
-	-make clean
+	make clean
+	rm -rf contrib/completions/
