@@ -9,7 +9,13 @@ export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
 %:
 	dh $@ --builddirectory=_build --buildsystem=golang --with=golang
 
+execute_after_dh_auto_build:
+	make docs/sbctl.8
+
 override_dh_auto_install:
 	dh_auto_install -- --no-source
 
 override_dh_auto_test:
+
+execute_after_dh_auto_clean:
+	-make clean
