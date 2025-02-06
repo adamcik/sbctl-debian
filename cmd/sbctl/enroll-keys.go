@@ -3,17 +3,22 @@ package main
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
+	"os"
+	"slices"
 	"strings"
 
-	"github.com/foxboron/go-uefi/efi"
 	"github.com/foxboron/go-uefi/efi/signature"
-	"github.com/foxboron/go-uefi/efi/util"
+	"github.com/foxboron/go-uefi/efivar"
 	"github.com/foxboron/sbctl"
+	"github.com/foxboron/sbctl/backend"
 	"github.com/foxboron/sbctl/certs"
+	"github.com/foxboron/sbctl/config"
 	"github.com/foxboron/sbctl/fs"
 	"github.com/foxboron/sbctl/logging"
+	"github.com/foxboron/sbctl/lsm"
 	"github.com/foxboron/sbctl/stringset"
+	"github.com/landlock-lsm/go-landlock/landlock"
+	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
 
@@ -57,75 +62,69 @@ var (
 	enrollKeysCmd = &cobra.Command{
 		Use:   "enroll-keys",
 		Short: "Enroll the current keys to EFI",
-		RunE:  RunEnrollKeys,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			state := cmd.Context().Value(stateDataKey{}).(*config.State)
+			if state.Config.Landlock {
+				if enrollKeysCmdOptions.Export.Value != "" {
+					wd, err := os.Getwd()
+					if err != nil {
+						return err
+					}
+					lsm.RestrictAdditionalPaths(
+						landlock.RWDirs(wd),
+					)
+				}
+				if err := lsm.Restrict(); err != nil {
+					return err
+				}
+			}
+			return RunEnrollKeys(state)
+		},
 	}
 	ErrSetupModeDisabled = errors.New("setup mode is disabled")
 )
 
+func SignSiglist(k *backend.KeyHierarchy, e efivar.Efivar, sigdb efivar.Marshallable) ([]byte, error) {
+	signer := k.GetKeyBackend(e)
+	_, em, err := signature.SignEFIVariable(e, sigdb, signer.Signer(), signer.Certificate())
+	if err != nil {
+		return nil, err
+	}
+	return em.Bytes(), nil
+}
+
 // Sync keys from a key directory into efivarfs
-func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
-	// Prepare all the keys we need
-	PKKey, err := fs.ReadFile(filepath.Join(keydir, "PK", "PK.key"))
+func KeySync(state *config.State, oems []string) error {
+	kh, err := backend.GetKeyHierarchy(state.Fs, state)
 	if err != nil {
 		return err
 	}
 
-	PKPem, err := fs.ReadFile(filepath.Join(keydir, "PK", "PK.pem"))
+	guid, err := state.Config.GetGUID(state.Fs)
 	if err != nil {
 		return err
 	}
 
-	KEKKey, err := fs.ReadFile(filepath.Join(keydir, "KEK", "KEK.key"))
-	if err != nil {
-		return err
-	}
-
-	KEKPem, err := fs.ReadFile(filepath.Join(keydir, "KEK", "KEK.pem"))
-	if err != nil {
-		return err
-	}
-
-	dbPem, err := fs.ReadFile(filepath.Join(keydir, "db", "db.pem"))
-	if err != nil {
-		return err
-	}
-
-	// Create the signature databases
-	var sigdb, sigkek, sigpk *signature.SignatureDatabase
+	var efistate *sbctl.EFIVariables
 
 	if !enrollKeysCmdOptions.Append {
-		sigdb = signature.NewSignatureDatabase()
-
-		sigkek = signature.NewSignatureDatabase()
-
-		sigpk = signature.NewSignatureDatabase()
-		// on append use the existing signature db
+		efistate = sbctl.NewEFIVariables(state.Efivarfs)
 	} else {
-		sigdb, err = efi.Getdb()
+		efistate, err = sbctl.SystemEFIVariables(state.Efivarfs)
 		if err != nil {
-			return err
-		}
-
-		sigkek, err = efi.GetKEK()
-		if err != nil {
-			return err
-		}
-
-		sigpk, err = efi.GetPK()
-		if err != nil {
-			return err
+			return fmt.Errorf("can't read efivariables: %v", err)
 		}
 	}
 
-	if err = sigdb.Append(signature.CERT_X509_GUID, guid, dbPem); err != nil {
+	if err = efistate.Db.Append(signature.CERT_X509_GUID, *guid, kh.Db.CertificateBytes()); err != nil {
 		return err
 	}
 
-	if err = sigkek.Append(signature.CERT_X509_GUID, guid, KEKPem); err != nil {
+	if err = efistate.KEK.Append(signature.CERT_X509_GUID, *guid, kh.KEK.CertificateBytes()); err != nil {
 		return err
 	}
 
-	if err = sigpk.Append(signature.CERT_X509_GUID, guid, PKPem); err != nil {
+	if err = efistate.PK.Append(signature.CERT_X509_GUID, *guid, kh.PK.CertificateBytes()); err != nil {
 		return err
 	}
 
@@ -134,14 +133,14 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 		switch oem {
 		case "tpm-eventlog":
 			logging.Print("\nWith checksums from the TPM Eventlog...")
-			eventlogDB, err := sbctl.GetEventlogChecksums(systemEventlog)
+			eventlogDB, err := sbctl.GetEventlogChecksums(state.Fs, systemEventlog)
 			if err != nil {
 				return fmt.Errorf("could not enroll db keys: %w", err)
 			}
 			if len((*eventlogDB)) == 0 {
 				return fmt.Errorf("could not find any OpROM entries in the TPM eventlog")
 			}
-			sigdb.AppendDatabase(eventlogDB)
+			efistate.Db.AppendDatabase(eventlogDB)
 		case "microsoft":
 			logging.Print("\nWith vendor keys from microsoft...")
 
@@ -150,32 +149,32 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 			if err != nil {
 				return fmt.Errorf("could not enroll db keys: %w", err)
 			}
-			sigdb.AppendDatabase(oemSigDb)
+			efistate.Db.AppendDatabase(oemSigDb)
 
 			// KEK
 			oemSigKEK, err := certs.GetOEMCerts(oem, "KEK")
 			if err != nil {
 				return fmt.Errorf("could not enroll KEK keys: %w", err)
 			}
-			sigkek.AppendDatabase(oemSigKEK)
+			efistate.KEK.AppendDatabase(oemSigKEK)
 
 			// We are not enrolling PK keys from Microsoft
 		case "custom":
 			logging.Print("\nWith custom keys...")
 
 			// db
-			customSigDb, err := certs.GetCustomCerts(keydir, "db")
+			customSigDb, err := certs.GetCustomCerts(state.Config.Keydir, "db")
 			if err != nil {
 				return fmt.Errorf("could not enroll custom db keys: %w", err)
 			}
-			sigdb.AppendDatabase(customSigDb)
+			efistate.Db.AppendDatabase(customSigDb)
 
 			// KEK
-			customSigKEK, err := certs.GetCustomCerts(keydir, "KEK")
+			customSigKEK, err := certs.GetCustomCerts(state.Config.Keydir, "KEK")
 			if err != nil {
 				return fmt.Errorf("could not enroll custom KEK keys: %w", err)
 			}
-			sigkek.AppendDatabase(customSigKEK)
+			efistate.KEK.AppendDatabase(customSigKEK)
 		case "firmware-builtin":
 			logging.Print("\nWith vendor certificates built into the firmware...")
 
@@ -186,11 +185,11 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 				}
 				switch cert {
 				case "db":
-					sigdb.AppendDatabase(builtinSigDb)
+					efistate.Db.AppendDatabase(builtinSigDb)
 				case "KEK":
-					sigkek.AppendDatabase(builtinSigDb)
+					efistate.KEK.AppendDatabase(builtinSigDb)
 				case "PK":
-					sigpk.AppendDatabase(builtinSigDb)
+					efistate.PK.AppendDatabase(builtinSigDb)
 				}
 			}
 		}
@@ -199,37 +198,37 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 	if enrollKeysCmdOptions.Export.Value != "" {
 		if enrollKeysCmdOptions.Export.Value == "auth" {
 			logging.Print("\nExporting as auth files...")
-			sigdb, err := sbctl.SignDatabase(sigdb, KEKKey, KEKPem, "db")
+			sigdb, err := SignSiglist(kh, efivar.Db, efistate.Db)
 			if err != nil {
 				return err
 			}
 
-			sigkek, err := sbctl.SignDatabase(sigkek, PKKey, PKPem, "KEK")
+			sigkek, err := SignSiglist(kh, efivar.KEK, efistate.KEK)
 			if err != nil {
 				return err
 			}
-			sigpk, err := sbctl.SignDatabase(sigpk, PKKey, PKPem, "PK")
+			sigpk, err := SignSiglist(kh, efivar.PK, efistate.PK)
 			if err != nil {
 				return err
 			}
-			if err := fs.WriteFile("db.auth", sigdb, 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "db.auth", sigdb, 0o644); err != nil {
 				return err
 			}
-			if err := fs.WriteFile("KEK.auth", sigkek, 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "KEK.auth", sigkek, 0o644); err != nil {
 				return err
 			}
-			if err := fs.WriteFile("PK.auth", sigpk, 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "PK.auth", sigpk, 0o644); err != nil {
 				return err
 			}
 		} else if enrollKeysCmdOptions.Export.Value == "esl" {
 			logging.Print("\nExporting as esl files...")
-			if err := fs.WriteFile("db.esl", sigdb.Bytes(), 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "db.esl", efistate.Db.Bytes(), 0o644); err != nil {
 				return err
 			}
-			if err := fs.WriteFile("KEK.esl", sigkek.Bytes(), 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "KEK.esl", efistate.KEK.Bytes(), 0o644); err != nil {
 				return err
 			}
-			if err := fs.WriteFile("PK.esl", sigpk.Bytes(), 0o644); err != nil {
+			if err := fs.WriteFile(state.Fs, "PK.esl", efistate.PK.Bytes(), 0o644); err != nil {
 				return err
 			}
 		}
@@ -239,15 +238,15 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 	if enrollKeysCmdOptions.Partial.Value != "" {
 		switch value := enrollKeysCmdOptions.Partial.Value; value {
 		case "db":
-			if err := sbctl.Enroll(sigdb, KEKKey, KEKPem, value); err != nil {
+			if err := efistate.EnrollKey(efivar.Db, kh); err != nil {
 				return err
 			}
 		case "KEK":
-			if err := sbctl.Enroll(sigkek, PKKey, PKPem, value); err != nil {
+			if err := efistate.EnrollKey(efivar.KEK, kh); err != nil {
 				return err
 			}
 		case "PK":
-			if err := sbctl.Enroll(sigpk, PKKey, PKPem, value); err != nil {
+			if err := efistate.EnrollKey(efivar.PK, kh); err != nil {
 				return err
 			}
 		default:
@@ -257,22 +256,21 @@ func KeySync(guid util.EFIGUID, keydir string, oems []string) error {
 		return nil
 	}
 
-	if err := sbctl.Enroll(sigdb, KEKKey, KEKPem, "db"); err != nil {
-		return err
-	}
-	if err := sbctl.Enroll(sigkek, PKKey, PKPem, "KEK"); err != nil {
-		return err
-	}
-	if err := sbctl.Enroll(sigpk, PKKey, PKPem, "PK"); err != nil {
+	if err := efistate.EnrollAllKeys(kh); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func RunEnrollKeys(cmd *cobra.Command, args []string) error {
-	// SetupMode is not necessarily required on a partial enrollment
-	if !efi.GetSetupMode() && enrollKeysCmdOptions.Partial.Value == "" && enrollKeysCmdOptions.Export.Value == "" {
+func RunEnrollKeys(state *config.State) error {
+	ok, err := state.Efivarfs.GetSetupMode()
+	// EFI variables are missing in some CI / build environments and setup mode is not needed for exporting keys
+	if err != nil && enrollKeysCmdOptions.Export.Value == "" {
+		return err
+	}
+	// SetupMode is not necessarily required for a partial enrollment and not needed for exporting keys
+	if !ok && enrollKeysCmdOptions.Partial.Value == "" && enrollKeysCmdOptions.Export.Value == "" {
 		return ErrSetupModeDisabled
 	}
 
@@ -285,7 +283,7 @@ func RunEnrollKeys(cmd *cobra.Command, args []string) error {
 		}
 		logging.Print("Enrolling custom bytes to EFI variables...")
 
-		if err := customKey(enrollKeysCmdOptions.Partial.Value, enrollKeysCmdOptions.CustomBytes); err != nil {
+		if err := customKey(state.Fs, enrollKeysCmdOptions.Partial.Value, enrollKeysCmdOptions.CustomBytes); err != nil {
 			logging.NotOk("")
 
 			return fmt.Errorf("couldn't roll out custom bytes from %s for hierarchy %s: %w", enrollKeysCmdOptions.CustomBytes, enrollKeysCmdOptions.Partial, err)
@@ -309,27 +307,32 @@ func RunEnrollKeys(cmd *cobra.Command, args []string) error {
 	if len(enrollKeysCmdOptions.BuiltinFirmwareCerts) >= 1 {
 		oems = append(oems, "firmware-builtin")
 	}
+
+	if len(state.Config.DbAdditions) != 0 {
+		for _, k := range state.Config.DbAdditions {
+			if !slices.Contains(oems, k) {
+				oems = append(oems, k)
+			}
+		}
+	}
+
 	if !enrollKeysCmdOptions.IgnoreImmutable && enrollKeysCmdOptions.Export.Value == "" {
-		if err := sbctl.CheckImmutable(); err != nil {
+		if err := sbctl.CheckImmutable(state.Fs); err != nil {
 			return err
 		}
 	}
-	if !enrollKeysCmdOptions.Force && !enrollKeysCmdOptions.TPMEventlogChecksums && !enrollKeysCmdOptions.MicrosoftKeys {
-		if err := sbctl.CheckEventlogOprom(systemEventlog); err != nil {
+	if !enrollKeysCmdOptions.Force && !enrollKeysCmdOptions.TPMEventlogChecksums && !enrollKeysCmdOptions.MicrosoftKeys && !enrollKeysCmdOptions.Append {
+		if err := sbctl.CheckEventlogOprom(state.Fs, systemEventlog); err != nil {
 			return err
 		}
 	}
-	uuid, err := sbctl.GetGUID()
-	if err != nil {
-		return err
-	}
-	guid := util.StringToGUID(uuid.String())
+
 	if enrollKeysCmdOptions.Export.Value != "" {
 		logging.Print("Exporting keys to EFI files...")
 	} else {
 		logging.Print("Enrolling keys to EFI variables...")
 	}
-	if err := KeySync(*guid, sbctl.KeysPath, oems); err != nil {
+	if err := KeySync(state, oems); err != nil {
 		logging.NotOk("")
 		return fmt.Errorf("couldn't sync keys: %w", err)
 	}
@@ -342,8 +345,8 @@ func RunEnrollKeys(cmd *cobra.Command, args []string) error {
 }
 
 // write custom key from a filePath into an efivar
-func customKey(hierarchy string, filePath string) error {
-	customBytes, err := fs.ReadFile(filePath)
+func customKey(vfs afero.Fs, hierarchy string, filePath string) error {
+	customBytes, err := fs.ReadFile(vfs, filePath)
 	if err != nil {
 		return err
 	}
