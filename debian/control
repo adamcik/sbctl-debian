@@ -1,28 +1,32 @@
 Source: sbctl
+Section: admin
+Priority: optional
 Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
 Uploaders:
  Faidon Liambotis <paravoid@debian.org>,
-Section: golang
-Testsuite: autopkgtest-pkg-go
-Priority: optional
+ Simon Josefsson <simon@josefsson.org>,
+Rules-Requires-Root: no
 Build-Depends:
  debhelper-compat (= 13),
- dh-golang,
+ dh-sequence-golang,
  golang-any,
  golang-github-fatih-color-dev,
+ golang-github-foxboron-go-tpm-keyfiles-dev,
  golang-github-foxboron-go-uefi-dev,
+ golang-github-goccy-go-yaml-dev,
+ golang-github-google-go-tpm-dev,
  golang-github-google-uuid-dev,
+ golang-github-landlock-lsm-go-landlock-dev,
  golang-github-spf13-afero-dev,
  golang-github-spf13-cobra-dev,
- golang-golang-x-crypto-dev,
  golang-golang-x-exp-dev,
  golang-golang-x-sys-dev,
- asciidoc-base,
-Standards-Version: 4.6.2
+ asciidoc,
+Testsuite: autopkgtest-pkg-go
+Standards-Version: 4.7.0
 Vcs-Browser: https://salsa.debian.org/go-team/packages/sbctl
 Vcs-Git: https://salsa.debian.org/go-team/packages/sbctl.git
 Homepage: https://github.com/foxboron/sbctl
-Rules-Requires-Root: no
 XS-Go-Import-Path: github.com/foxboron/sbctl
 
 Package: sbctl

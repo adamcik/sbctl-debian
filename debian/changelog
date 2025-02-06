@@ -1,5 +1,9 @@
-sbctl (0.13-1) UNRELEASED; urgency=medium
+sbctl (0.16-1) unstable; urgency=medium
 
+  [ Faidon Liambotis ]
   * Initial release. (Closes: #1030845)
 
- -- Faidon Liambotis <paravoid@debian.org>  Wed, 27 Dec 2023 21:22:32 +0000
+  [ Simon Josefsson ]
+  * Finialize initial packaging.
+
+ -- Simon Josefsson <simon@josefsson.org>  Thu, 06 Feb 2025 10:15:47 +0100

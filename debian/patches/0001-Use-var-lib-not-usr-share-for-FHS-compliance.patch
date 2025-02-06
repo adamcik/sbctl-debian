@@ -10,109 +10,41 @@ sed -i 's;usr/share/secureboot;var/lib/secureboot;g'
  3 files changed, 16 insertions(+), 16 deletions(-)
 
 diff --git a/docs/sbctl.8.txt b/docs/sbctl.8.txt
-index aed1718..28f009a 100644
+index 238f869..e7e4146 100644
 --- a/docs/sbctl.8.txt
 +++ b/docs/sbctl.8.txt
-@@ -35,12 +35,12 @@ EFI signing commands
-         *-e*, *--export*;;
-                 The directory to persist the exported keys.
+@@ -281,7 +281,7 @@ EFI signing commands
+                 Migrate the configuration and setup of sbctl to a new iteration.
+                 +
+                 Currently the only migration for sbctl is moving from
+-                /usr/share/secureboot to /var/lib/sbctl.
++                /var/lib/secureboot to /var/lib/sbctl.
  
--                Default: "/usr/share/secureboot/keys/"
-+                Default: "/var/lib/secureboot/keys/"
- 
-         *-d*, *--database-path*;;
-                 Path to save the GUID file when generating keys.
- 
--                Default: "/usr/share/secureboot/"
-+                Default: "/var/lib/secureboot/"
- 
- **enroll-keys**::
-         Enrolls the created key into the EFI variables. 
-@@ -63,8 +63,8 @@ EFI signing commands
-                 This feature is experimental
- 
-         *-c*, *--custom*;;
--                Enroll custom KEK and db certificates from "/usr/share/secureboot/keys/custom/KEK/",
--                "/usr/share/secureboot/keys/custom/db/",
-+                Enroll custom KEK and db certificates from "/var/lib/secureboot/keys/custom/KEK/",
-+                "/var/lib/secureboot/keys/custom/db/",
-                 respectively.
- 
-         *-f*, *--firmware-builtin*;;
-@@ -290,7 +290,7 @@ not be enabled unless no other way to enter key management is provided.
- If this step is not completed, enrolling custom keys will be rejected by the firmware.
- 
- Next is creating the keys for secure boot. 'create-keys' creates the key
--hierarchy needed for secure boot into "/usr/share/secureboot".
-+hierarchy needed for secure boot into "/var/lib/secureboot".
- 
-         $ sbctl create-keys
-         Created Owner UUID a9fbbdb7-a05f-48d5-b63a-08c5df45ee70
-@@ -399,32 +399,32 @@ Environment variables
- 
- Files
- ----
--**/usr/share/secureboot**::
-+**/var/lib/secureboot**::
-         Default storage directory.
- 
--**/usr/share/secureboot/GUID**::
-+**/var/lib/secureboot/GUID**::
-         Owner identification. This is a randomly generated UUID.
- 
--**/usr/share/secureboot/files.db**::
-+**/var/lib/secureboot/files.db**::
-         Contains a list of EFI binaries to be signed by the generated key.
- 
--**/usr/share/secureboot/bundles.db**::
-+**/var/lib/secureboot/bundles.db**::
-         Contains a list of EFI bundles to be generated.
- 
--**/usr/share/secureboot/keys/db/db.{pem,key}**::
-+**/var/lib/secureboot/keys/db/db.{pem,key}**::
-         Contains the Signature Database key used for signing EFI binaries.
- 
--**/usr/share/secureboot/keys/KEK/KEK.{pem,key}**::
-+**/var/lib/secureboot/keys/KEK/KEK.{pem,key}**::
-         Contains the Key Exchange Key.
- 
--**/usr/share/secureboot/keys/PK/PK.{pem,key}**::
-+**/var/lib/secureboot/keys/PK/PK.{pem,key}**::
-         Contains the Platform Key.
- 
--**/usr/share/secureboot/keys/custom/KEK/***::
-+**/var/lib/secureboot/keys/custom/KEK/***::
-         Contains custom certificates which will be added to the firmware as
-         additional Key Exchange Keys.
- 
--**/usr/share/secureboot/keys/custom/db/***::
-+**/var/lib/secureboot/keys/custom/db/***::
-         Contains custom certificates which will be added to the firmware
-         Signature Database.
- 
-diff --git a/keys.go b/keys.go
-index bad7baa..496e6ef 100644
---- a/keys.go
-+++ b/keys.go
-@@ -27,7 +27,7 @@ import (
- var RSAKeySize = 4096
- 
+         *--print-config*;;
+                 Prints a serialized version of the current configuration of
+diff --git a/sbctl.go b/sbctl.go
+index 9962b1a..0e13c02 100644
+--- a/sbctl.go
++++ b/sbctl.go
+@@ -19,7 +19,7 @@ import (
  var (
+ 	// TODO: Remove this at some point
+ 	//       Only here for legacy reasons to denote the old path
 -	DatabasePath = "/usr/share/secureboot/"
 +	DatabasePath = "/var/lib/secureboot/"
- 	KeysPath     = filepath.Join(DatabasePath, "keys")
- 	PKKey        = filepath.Join(KeysPath, "PK", "PK.key")
- 	PKCert       = filepath.Join(KeysPath, "PK", "PK.pem")
-diff --git a/tests/integrations/enroll_keys_test.go b/tests/integrations/enroll_keys_test.go
-index c83b3f1..78a6255 100644
---- a/tests/integrations/enroll_keys_test.go
-+++ b/tests/integrations/enroll_keys_test.go
-@@ -19,7 +19,7 @@ func TestEnrollKeys(t *testing.T) {
- 		t.Fatal("not in setup mode")
- 	}
+ 	Version      = "unknown"
+ )
+ 
+diff --git a/tests/integrations/enroll_keys/enroll_keys_test.go b/tests/integrations/enroll_keys/enroll_keys_test.go
+index c72c795..0ee25c0 100644
+--- a/tests/integrations/enroll_keys/enroll_keys_test.go
++++ b/tests/integrations/enroll_keys/enroll_keys_test.go
+@@ -20,7 +20,7 @@ func TestEnrollKeys(t *testing.T) {
+ 	g.Expect(efi.GetSecureBoot()).To(BeFalse(), "should not be in secure boot mode")
+ 	g.Expect(efi.GetSetupMode()).To(BeTrue(), "should be in setup mode")
  
 -	utils.Exec("rm -rf /usr/share/secureboot")
 +	utils.Exec("rm -rf /var/lib/secureboot")
- 	utils.Exec("/mnt/sbctl status")
- 	utils.Exec("/mnt/sbctl create-keys")
- 	utils.Exec("/mnt/sbctl enroll-keys")
+ 	utils.Exec("sbctl status")
+ 	utils.Exec("sbctl create-keys")
+ 	out, err := utils.ExecWithOutput("sbctl enroll-keys")
