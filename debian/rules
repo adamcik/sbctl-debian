@@ -9,7 +9,7 @@ export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
 MANS = $(basename $(wildcard docs/*.txt))
 
 %:
-	dh $@ --builddirectory=_build --buildsystem=golang --with=golang
+	dh $@ --builddirectory=_build --buildsystem=golang
 
 execute_after_dh_auto_build:
 	make $(MANS)
