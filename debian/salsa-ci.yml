@@ -1,13 +1,14 @@
 include:
 - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/recipes/debian.yml
-- https://salsa.debian.org/debian/licenserecon/raw/main/debian/licenserecon.yml
+- https://salsa.debian.org/newgateway-team/pipelines/raw/main/pipeline-jobs.yml
 
 variables:
-  SALSA_CI_ENABLE_WRAP_AND_SORT: 'true'
-  SALSA_CI_WRAP_AND_SORT_ARGS: '-asbkt'
+  SALSA_CI_AUTOPKGTEST_ALLOWED_EXIT_STATUS: '0'
   SALSA_CI_DISABLE_APTLY: 0
-
-before_script:
-  - echo "deb [trusted=yes] https://salsa.debian.org/jas/libcap2/-/jobs/7109984/artifacts/raw/aptly unstable main" | tee --append /etc/apt/sources.list.d/add.list
-  - echo "deb [trusted=yes] https://salsa.debian.org/jas/golang-github-landlock-lsm-go-landlock/-/jobs/7110066/artifacts/raw/aptly unstable main" | tee --append /etc/apt/sources.list.d/add.list
-  - apt-get update
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ARM64: 0
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ARMEL: 0
+  SALSA_CI_DISABLE_BUILD_PACKAGE_ARMHF: 0
+  SALSA_CI_DISABLE_LICENSERECON: 0
+  SALSA_CI_ENABLE_WRAP_AND_SORT: 'true'
+  SALSA_CI_LINTIAN_FAIL_WARNING: '1'
+  SALSA_CI_WRAP_AND_SORT_ARGS: '-asbkt'
