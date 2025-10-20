@@ -23,6 +23,7 @@ Build-Depends:
  golang-github-spf13-cobra-dev,
  golang-golang-x-exp-dev,
  golang-golang-x-sys-dev,
+ libpcsclite-dev,
  pkgconf,
 Testsuite: autopkgtest-pkg-go
 Standards-Version: 4.7.0
