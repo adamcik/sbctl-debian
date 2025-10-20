@@ -8,10 +8,12 @@ Uploaders:
 Build-Depends:
  debhelper-compat (= 13),
  dh-sequence-golang,
+ asciidoc,
  golang-any,
  golang-github-fatih-color-dev,
  golang-github-foxboron-go-tpm-keyfiles-dev,
  golang-github-foxboron-go-uefi-dev,
+ golang-github-go-piv-piv-go-dev (>= 2.0),
  golang-github-goccy-go-yaml-dev,
  golang-github-google-go-tpm-dev,
  golang-github-google-uuid-dev,
@@ -20,7 +22,6 @@ Build-Depends:
  golang-github-spf13-cobra-dev,
  golang-golang-x-exp-dev,
  golang-golang-x-sys-dev,
- asciidoc,
 Testsuite: autopkgtest-pkg-go
 Standards-Version: 4.7.0
 Vcs-Browser: https://salsa.debian.org/go-team/packages/sbctl
@@ -31,6 +32,18 @@ XS-Go-Import-Path: github.com/foxboron/sbctl
 Package: sbctl
 Architecture: any
 Depends:
+ golang-github-fatih-color-dev,
+ golang-github-foxboron-go-tpm-keyfiles-dev,
+ golang-github-foxboron-go-uefi-dev,
+ golang-github-go-piv-piv-go-dev (>= 2.0),
+ golang-github-goccy-go-yaml-dev,
+ golang-github-google-go-tpm-dev,
+ golang-github-google-uuid-dev,
+ golang-github-landlock-lsm-go-landlock-dev,
+ golang-github-spf13-afero-dev,
+ golang-github-spf13-cobra-dev,
+ golang-golang-x-exp-dev,
+ golang-golang-x-sys-dev,
  ${misc:Depends},
  ${shlibs:Depends},
 Built-Using:
