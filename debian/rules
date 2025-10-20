@@ -6,11 +6,13 @@ export DH_GOLANG_EXCLUDES := tests/
 
 export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
 
+MANS = $(basename $(wildcard docs/*.txt))
+
 %:
 	dh $@ --builddirectory=_build --buildsystem=golang --with=golang
 
 execute_after_dh_auto_build:
-	make docs/sbctl.8
+	make $(MANS)
 	# from Makefile, but with _build/bin/sbctl instead, and proper perms
 	_build/bin/sbctl completion bash | install -m644 -D /dev/stdin contrib/completions/bash-completion/completions/sbctl
 	_build/bin/sbctl completion zsh | install -m644 -D /dev/stdin contrib/completions/zsh/site-functions/_sbctl
@@ -18,6 +20,7 @@ execute_after_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install -- --no-source
+	dh_installman $(MANS)
 
 override_dh_auto_test:
 	-dh_auto_test

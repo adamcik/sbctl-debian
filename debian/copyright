@@ -10,6 +10,7 @@ License: Expat
 Files: debian/*
 Copyright: 2023 Faidon Liambotis <paravoid@debian.org>
            2025 Simon Josefsson <simon@josefsson.org>
+           2025 Alexander GQ Gerasiov <gq@debian.org>
 License: Expat
 Comment: Debian packaging is licensed under the same terms as upstream
 

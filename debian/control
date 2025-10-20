@@ -8,7 +8,7 @@ Uploaders:
 Build-Depends:
  debhelper-compat (= 13),
  dh-sequence-golang,
- asciidoc,
+ asciidoc-base,
  golang-any,
  golang-github-fatih-color-dev,
  golang-github-foxboron-go-tpm-keyfiles-dev,
@@ -48,8 +48,11 @@ Depends:
  golang-github-spf13-cobra-dev,
  golang-golang-x-exp-dev,
  golang-golang-x-sys-dev,
+ jq,
  ${misc:Depends},
  ${shlibs:Depends},
+Recommends:
+ systemd-boot,
 Built-Using:
  ${misc:Built-Using},
 Static-Built-Using:

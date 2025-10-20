@@ -4,6 +4,9 @@ sbctl (0.18-1) experimental; urgency=medium
   * Initial release. (Closes: #1030845)
 
   [ Simon Josefsson ]
-  * Finialize initial packaging.
+  * Improve packaging.
 
- -- Simon Josefsson <simon@josefsson.org>  Thu, 06 Feb 2025 10:15:47 +0100
+  [ Alexander GQ Gerasiov ]
+  * Improve packaging.
+
+ -- Simon Josefsson <simon@josefsson.org>  Mon, 20 Oct 2025 16:40:47 +0200
