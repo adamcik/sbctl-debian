@@ -52,6 +52,8 @@ Depends:
  ${shlibs:Depends},
 Built-Using:
  ${misc:Built-Using},
+Static-Built-Using:
+ ${misc:Static-Built-Using},
 Description: UEFI Secure Boot key manager
  sbctl intends to be a user-friendly secure boot key manager capable of
  setting up secure boot, offer key management capabilities, and keep
