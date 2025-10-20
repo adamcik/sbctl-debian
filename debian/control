@@ -5,6 +5,7 @@ Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
 Uploaders:
  Faidon Liambotis <paravoid@debian.org>,
  Simon Josefsson <simon@josefsson.org>,
+ Alexander GQ Gerasiov <gq@debian.org>,
 Build-Depends:
  debhelper-compat (= 13),
  dh-sequence-golang,
