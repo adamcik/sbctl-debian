@@ -1,4 +1,4 @@
-sbctl (0.16-1) unstable; urgency=medium
+sbctl (0.18-1) unstable; urgency=medium
 
   [ Faidon Liambotis ]
   * Initial release. (Closes: #1030845)
