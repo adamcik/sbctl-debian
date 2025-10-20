@@ -16,6 +16,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type VerifiedFile struct {
+	FileName       string         `json:"file_name"`
+	// IsSigned should be set to one of these values:
+	//   -  0: "unsigned"
+	//   -  1: "signed"
+	//   - -1: "file does not exist"
+	IsSigned       int8           `json:"is_signed"`
+}
+
 var (
 	ErrInvalidHeader = errors.New("invalid pe header")
 	verifyCmd        = &cobra.Command{
@@ -23,12 +32,16 @@ var (
 		Short: "Find and check if files in the ESP are signed or not",
 		RunE:  RunVerify,
 	}
+	verifiedFiles      []VerifiedFile
 )
 
 func VerifyOneFile(state *config.State, f string) error {
 	o, err := state.Fs.Open(f)
+	fileentry := VerifiedFile{FileName: f, IsSigned: 0}
 	if errors.Is(err, os.ErrNotExist) {
 		logging.Warn("%s does not exist", f)
+		fileentry.IsSigned = -1
+		verifiedFiles = append(verifiedFiles, fileentry)
 		return nil
 	} else if errors.Is(err, os.ErrPermission) {
 		logging.Warn("%s permission denied. Can't read file\n", f)
@@ -40,7 +53,7 @@ func VerifyOneFile(state *config.State, f string) error {
 		logging.Error(fmt.Errorf("failed to read file %s: %s", f, err))
 	}
 	if !ok {
-		return ErrInvalidHeader
+		return fmt.Errorf("%s: %w", f, ErrInvalidHeader)
 	}
 
 	kh, err := backend.GetKeyHierarchy(state.Fs, state)
@@ -52,11 +65,15 @@ func VerifyOneFile(state *config.State, f string) error {
 	if err != nil {
 		return err
 	}
+
 	if ok {
 		logging.Ok("%s is signed", f)
+		fileentry.IsSigned = 1
 	} else {
 		logging.NotOk("%s is not signed", f)
 	}
+	verifiedFiles = append(verifiedFiles, fileentry)
+
 	return nil
 }
 
@@ -84,12 +101,15 @@ func RunVerify(cmd *cobra.Command, args []string) error {
 	if len(args) > 0 {
 		for _, file := range args {
 			if err := VerifyOneFile(state, file); err != nil {
-				if errors.Is(ErrInvalidHeader, err) {
+				if errors.Is(err, ErrInvalidHeader) {
 					logging.Error(fmt.Errorf("%s is not a valid EFI binary", file))
 					return nil
 				}
 				return err
 			}
+		}
+		if cmdOptions.JsonOutput {
+			return JsonOut(verifiedFiles)
 		}
 		return nil
 	}
@@ -116,7 +136,7 @@ func RunVerify(cmd *cobra.Command, args []string) error {
 		}
 		if err = VerifyOneFile(state, path); err != nil {
 			// We are scanning the ESP, so ignore invalid files
-			if errors.Is(ErrInvalidHeader, err) {
+			if errors.Is(err, ErrInvalidHeader) {
 				return nil
 			}
 			logging.Error(fmt.Errorf("failed to verify file %s: %s", path, err))
@@ -124,6 +144,9 @@ func RunVerify(cmd *cobra.Command, args []string) error {
 		return nil
 	}); err != nil {
 		return err
+	}
+	if cmdOptions.JsonOutput {
+		return JsonOut(verifiedFiles)
 	}
 	return nil
 }
