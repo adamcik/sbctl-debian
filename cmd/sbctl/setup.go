@@ -154,7 +154,7 @@ func SetupInstallation(state *config.State) error {
 
 func MigrateSetup(state *config.State) error {
 	if !state.IsInstalled() {
-		return fmt.Errorf("sbctl is not installd")
+		return fmt.Errorf("sbctl is not installed")
 	}
 
 	newConf := config.DefaultConfig()
@@ -237,6 +237,8 @@ func setupCmdFlags(cmd *cobra.Command) {
 	f.BoolVarP(&setupCmdOptions.PrintState, "print-state", "", false, "print the state of sbctl")
 	f.BoolVarP(&setupCmdOptions.Migrate, "migrate", "", false, "migrate the sbctl installation")
 	f.BoolVarP(&setupCmdOptions.Setup, "setup", "", false, "setup the sbctl installation")
+	cmd.MarkFlagsOneRequired("print-config", "print-state", "migrate", "setup")
+	cmd.MarkFlagsMutuallyExclusive("print-config", "print-state", "migrate", "setup")
 }
 
 func init() {
