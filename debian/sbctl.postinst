@@ -1,0 +1,59 @@
+#!/bin/sh
+set -e
+
+setup() {
+    if test ! "$INSTALLED" = "true"; then
+        sbctl create-keys
+    fi
+    if test "$ENABLED" = "true"; then
+        echo "sbctl: SecureBoot is already enabled." >&2
+        echo "sbctl: Configure sbctl manually if needed." >&2
+	return
+    fi
+    if test ! "$SETUP_MODE" = "true"; then
+        echo "sbctl: Turn SecureBoot on and switch to Setup mode to enroll keys with 'sbctl enroll-keys'." >&2
+        return
+    fi
+
+    sbctl enroll-keys || echo "sbctl: Automatic keys enrollment failed. Do it manually with 'sbctl enroll-keys'." >&2
+
+    # Sign default boot entry
+    if bootctl is-installed -q; then
+        DEFAULT_LINUX="$(bootctl -x)/$(bootctl --json=pretty list | jq -r '.[] | select(.isDefault == true) | .linux')"
+        test -f "$DEFAULT_LINUX" && sbctl sign "$DEFAULT_LINUX"
+    fi
+}
+
+sign_systemd_boot() {
+    test ! "$INSTALLED" = "true" && return
+    rm -f /usr/lib/systemd/boot/efi/*.signed
+    for FILE in /usr/lib/systemd/boot/efi/*; do
+        test -f "$FILE" && \
+            sbctl sign "$FILE" --output "$FILE.signed"
+    done
+}
+
+INSTALLED=$(sbctl status --json | jq -r '.installed')
+SETUP_MODE=$(sbctl status --json | jq -r '.setup_mode')
+ENABLED=$(sbctl status --json | jq -r '.secure_boot')
+
+
+case "$1" in
+triggered)
+    sign_systemd_boot
+    ;;
+configure)
+    test -z "$2" && setup
+
+    sign_systemd_boot
+    # activate systemd-boot-signed trigger may be a better way, but is doesn't work without shim
+    bootctl is-installed -q && bootctl install
+
+    # sbctl verify just for information
+    sbctl verify || true
+    ;;
+esac
+
+#DEBHELPER#
+
+exit 0

@@ -34,31 +34,12 @@ Homepage: https://github.com/foxboron/sbctl
 XS-Go-Import-Path: github.com/foxboron/sbctl
 
 Package: sbctl
-Architecture: any
+Architecture: all
 Depends:
- golang-github-fatih-color-dev,
- golang-github-foxboron-go-tpm-keyfiles-dev,
- golang-github-foxboron-go-uefi-dev,
- golang-github-go-piv-piv-go-dev (>= 2.0),
- golang-github-goccy-go-yaml-dev,
- golang-github-google-go-attestation-dev,
- golang-github-google-go-tpm-dev,
- golang-github-google-uuid-dev,
- golang-github-landlock-lsm-go-landlock-dev,
- golang-github-spf13-afero-dev,
- golang-github-spf13-cobra-dev,
- golang-golang-x-exp-dev,
- golang-golang-x-sys-dev,
- jq,
+ sbctl-bin,
  ${misc:Depends},
  ${shlibs:Depends},
-Recommends:
- systemd-boot,
-Built-Using:
- ${misc:Built-Using},
-Static-Built-Using:
- ${misc:Static-Built-Using},
-Description: UEFI Secure Boot key manager
+Description: UEFI Secure Boot key manager (automated setup)
  sbctl intends to be a user-friendly secure boot key manager capable of
  setting up secure boot, offer key management capabilities, and keep
  track of files that needs to be signed in the boot chain.
@@ -71,3 +52,33 @@ Description: UEFI Secure Boot key manager
   * Verify ESP of files missing signatures
   * EFI stub generation
   * JSON output
+ .
+ This package automate using sbctl, see 'sbctl-bin' for binary only.
+
+Package: sbctl-bin
+Architecture: any
+Depends:
+ jq,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Recommends:
+ systemd-boot,
+Built-Using:
+ ${misc:Built-Using},
+Static-Built-Using:
+ ${misc:Static-Built-Using},
+Description: UEFI Secure Boot key manager (Go program)
+ sbctl intends to be a user-friendly secure boot key manager capable of
+ setting up secure boot, offer key management capabilities, and keep
+ track of files that needs to be signed in the boot chain.
+ .
+ Features:
+  * User-friendly
+  * Manages secure boot keys
+  * Live enrollment of keys
+  * Signing database to help keep track of files to sign
+  * Verify ESP of files missing signatures
+  * EFI stub generation
+  * JSON output
+ .
+ This package contains the 'sbctl' tool.

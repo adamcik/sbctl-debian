@@ -1,0 +1,2 @@
+interest-await /usr/lib/systemd/boot/efi
+#activate systemd-boot-signed

@@ -20,7 +20,6 @@ execute_after_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install -- --no-source
-	dh_installman $(MANS)
 
 override_dh_auto_test:
 	-dh_auto_test

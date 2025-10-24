@@ -1,8 +1,5 @@
+usr/bin
 # shell completions
 contrib/completions/bash-completion/completions/sbctl usr/share/bash-completion/completions
 contrib/completions/fish/vendor_completions.d/sbctl.fish usr/share/fish/vendor_completions.d
 contrib/completions/zsh/site-functions/_sbctl usr/share/zsh/site-functions
-# kernel-install(8) snippet
-contrib/kernel-install/91-sbctl.install usr/lib/kernel/install.d
-# config file
-debian/sbctl.conf etc/sbctl
