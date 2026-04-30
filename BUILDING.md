@@ -72,10 +72,26 @@ https://adamcik.github.io/sbctl-debian
 Example local source setup (signed):
 
 ```bash
+sudo install -d -m 0755 /etc/apt/keyrings
 curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | \
-  sudo tee /usr/share/keyrings/sbctl-archive-keyring.gpg >/dev/null
-curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl.sources | \
-  sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
+  sudo tee /etc/apt/keyrings/sbctl-archive-keyring.gpg >/dev/null
+cat <<'EOF' | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
+Types: deb
+URIs: https://adamcik.github.io/sbctl-debian
+Suites: trixie
+Components: main
+Architectures: amd64
+Signed-By: /etc/apt/keyrings/sbctl-archive-keyring.gpg
+EOF
+cat <<'EOF' | sudo tee /etc/apt/preferences.d/sbctl.pref >/dev/null
+Package: sbctl sbctl-bin
+Pin: origin adamcik.github.io
+Pin-Priority: 700
+
+Package: *
+Pin: origin adamcik.github.io
+Pin-Priority: -1
+EOF
 sudo apt update
 sudo apt install sbctl
 ```
