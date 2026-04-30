@@ -12,7 +12,7 @@ MANS = $(basename $(wildcard docs/*.txt))
 	dh $@
 
 override_dh_auto_build:
-	go build -trimpath -buildmode=pie -ldflags="-compressdwarf=false -X github.com/foxboron/sbctl.Version=$(shell dpkg-parsechangelog -S Version)" -o sbctl ./cmd/sbctl
+	go build -buildvcs=false -trimpath -buildmode=pie -ldflags="-compressdwarf=false -X github.com/foxboron/sbctl.Version=$(shell dpkg-parsechangelog -S Version)" -o sbctl ./cmd/sbctl
 	make $(MANS)
 	# from Makefile, with proper perms
 	./sbctl completion bash | install -m644 -D /dev/stdin contrib/completions/bash-completion/completions/sbctl
