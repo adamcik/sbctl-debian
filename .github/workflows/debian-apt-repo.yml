@@ -57,14 +57,19 @@ jobs:
           path: artifacts/
 
   publish:
-    name: Prepare APT repository artifact for Pages
+    name: Prepare signed APT repository artifact for Pages
     runs-on: ubuntu-latest
     needs: build
+    if: github.ref == 'refs/heads/trixie'
+    environment:
+      name: apt-signing
+    permissions:
+      contents: read
     steps:
       - name: Install repository tooling
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils xz-utils gzip
+          sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils xz-utils gzip gnupg
 
       - name: Download built artifacts
         uses: actions/download-artifact@v4
@@ -72,16 +77,102 @@ jobs:
           name: debian-packages
           path: artifacts
 
-      - name: Build repository structure
+      - name: Enforce publish allowlist
         run: |
+          set -eu
+          for file in artifacts/*.deb; do
+            base="$(basename "$file")"
+            case "$base" in
+              sbctl_*_all.deb|sbctl-bin_*_amd64.deb)
+                ;;
+              *)
+                echo "Unexpected package in artifacts: $base" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+      - name: Import APT signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+        run: |
+          set -eu
+          export GNUPGHOME="$(mktemp -d)"
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
+          gpg --batch --list-secret-keys "$APT_GPG_KEY_ID"
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
+      - name: Build repository structure
+        env:
+          APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
+          APT_GPG_PUBLIC_KEY: ${{ secrets.APT_GPG_PUBLIC_KEY }}
+        run: |
+          set -eu
           mkdir -p repo/pool/main repo/dists/trixie/main/binary-amd64
-          cp artifacts/*.deb repo/pool/main/
+          cp artifacts/sbctl_*_all.deb repo/pool/main/
+          cp artifacts/sbctl-bin_*_amd64.deb repo/pool/main/
 
           dpkg-scanpackages --arch amd64 repo/pool > repo/dists/trixie/main/binary-amd64/Packages
           gzip -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.gz
           xz -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.xz
 
-          apt-ftparchive release repo/dists/trixie > repo/dists/trixie/Release
+          apt-ftparchive \
+            -o APT::FTPArchive::Release::Origin="Thomas Adamcik" \
+            -o APT::FTPArchive::Release::Label="sbctl-debian" \
+            -o APT::FTPArchive::Release::Suite="trixie" \
+            -o APT::FTPArchive::Release::Codename="trixie" \
+            -o APT::FTPArchive::Release::Architectures="amd64" \
+            -o APT::FTPArchive::Release::Components="main" \
+            -o APT::FTPArchive::Release::Description="sbctl Debian packages" \
+            release repo/dists/trixie > repo/dists/trixie/Release
+
+          gpg --batch --yes --pinentry-mode loopback --default-key "$APT_GPG_KEY_ID" --clearsign -o repo/dists/trixie/InRelease repo/dists/trixie/Release
+          gpg --batch --yes --pinentry-mode loopback --default-key "$APT_GPG_KEY_ID" -abs -o repo/dists/trixie/Release.gpg repo/dists/trixie/Release
+
+          printf '%s' "$APT_GPG_PUBLIC_KEY" | gpg --batch --dearmor -o repo/sbctl-archive-keyring.gpg
+          printf '%s\n' "$APT_GPG_PUBLIC_KEY" > repo/sbctl-archive-keyring.asc
+
+          cat > repo/sbctl.sources <<'EOF'
+          Types: deb
+          URIs: https://adamcik.github.io/sbctl-debian
+          Suites: trixie
+          Components: main
+          Architectures: amd64
+          Signed-By: /usr/share/keyrings/sbctl-archive-keyring.gpg
+          EOF
+
+          cat > repo/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>sbctl Debian APT repository</title>
+            <style>
+              body { font-family: sans-serif; margin: 2rem auto; max-width: 52rem; line-height: 1.5; padding: 0 1rem; }
+              code, pre { background: #f5f5f5; padding: 0.15rem 0.3rem; }
+              pre { overflow: auto; padding: 0.75rem; }
+            </style>
+          </head>
+          <body>
+            <h1>sbctl Debian APT repository</h1>
+            <p>Suite: <code>trixie</code>, Component: <code>main</code>, Architecture: <code>amd64</code>.</p>
+            <h2>Install</h2>
+            <pre><code>curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | sudo tee /usr/share/keyrings/sbctl-archive-keyring.gpg >/dev/null
+curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl.sources | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
+sudo apt update
+sudo apt install sbctl</code></pre>
+            <h2>Repository files</h2>
+            <ul>
+              <li><a href="./sbctl.sources">sbctl.sources</a></li>
+              <li><a href="./sbctl-archive-keyring.gpg">sbctl-archive-keyring.gpg</a></li>
+              <li><a href="./dists/trixie/">dists/trixie/</a></li>
+              <li><a href="./pool/main/">pool/main/</a></li>
+            </ul>
+          </body>
+          </html>
+          EOF
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -95,6 +186,7 @@ jobs:
     name: Deploy Pages
     runs-on: ubuntu-latest
     needs: publish
+    if: github.ref == 'refs/heads/trixie'
     permissions:
       contents: read
       pages: write

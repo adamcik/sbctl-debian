@@ -49,23 +49,33 @@ The repository includes a GitHub Actions workflow at
 `.github/workflows/debian-apt-repo.yml` that:
 
 1. Builds trixie `.deb` artifacts from this branch.
-2. Creates a simple APT repository structure.
+2. Creates and signs an APT repository structure.
 3. Publishes it to the `gh-pages` branch.
+
+### Required GitHub environment
+
+Create a protected GitHub Actions environment named `apt-signing` and keep it
+restricted to your `trixie` branch.
+
+Add these secrets in that environment:
+
+- `APT_GPG_PRIVATE_KEY`: ASCII-armored private key used to sign Release files.
+- `APT_GPG_PUBLIC_KEY`: matching ASCII-armored public key.
+- `APT_GPG_KEY_ID`: key id or fingerprint used by `gpg --default-key`.
 
 Repository URL shape after publishing:
 
 ```text
-https://<github-user>.github.io/<repo>
+https://adamcik.github.io/sbctl-debian
 ```
 
-Example local source list entry (unsigned quick setup):
+Example local source setup (signed):
 
 ```bash
-echo "deb [trusted=yes] https://<github-user>.github.io/<repo> trixie main" | \
-  sudo tee /etc/apt/sources.list.d/sbctl-local.list
+curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | \
+  sudo tee /usr/share/keyrings/sbctl-archive-keyring.gpg >/dev/null
+curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl.sources | \
+  sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
 sudo apt update
 sudo apt install sbctl
 ```
-
-For production-style use, add GPG signing to the workflow and use
-`signed-by=` instead of `trusted=yes`.
