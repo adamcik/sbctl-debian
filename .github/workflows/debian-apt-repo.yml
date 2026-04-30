@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - debian/sid
+      - trixie
     paths:
       - 'debian/**'
       - '.github/workflows/debian-apt-repo.yml'
