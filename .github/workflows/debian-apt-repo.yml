@@ -98,7 +98,8 @@ jobs:
           APT_GPG_KEY_ID: ${{ secrets.APT_GPG_KEY_ID }}
         run: |
           set -eu
-          export GNUPGHOME="$(mktemp -d)"
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
           gpg --batch --list-secret-keys "$APT_GPG_KEY_ID"
           echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
@@ -160,9 +161,9 @@ jobs:
             <p>Suite: <code>trixie</code>, Component: <code>main</code>, Architecture: <code>amd64</code>.</p>
             <h2>Install</h2>
             <pre><code>curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | sudo tee /usr/share/keyrings/sbctl-archive-keyring.gpg >/dev/null
-curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl.sources | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
-sudo apt update
-sudo apt install sbctl</code></pre>
+            curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl.sources | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
+            sudo apt update
+            sudo apt install sbctl</code></pre>
             <h2>Repository files</h2>
             <ul>
               <li><a href="./sbctl.sources">sbctl.sources</a></li>
