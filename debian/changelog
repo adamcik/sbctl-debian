@@ -1,3 +1,12 @@
+sbctl (0.18-1~local1) experimental; urgency=medium
+
+  * Local-only packaging variant for trixie builds.
+  * Drop dh-golang and Debian Go library Build-Depends; build with upstream
+    go.mod dependencies.
+  * Work around trixie dwz/Go 1.25 incompatibility by skipping dh_dwz.
+
+ -- Thomas Adamcik <thomas@adamcik.no>  Thu, 30 Apr 2026 20:30:00 +0000
+
 sbctl (0.18-1) experimental; urgency=medium
 
   [ Faidon Liambotis ]

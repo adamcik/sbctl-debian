@@ -9,17 +9,24 @@ export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
 MANS = $(basename $(wildcard docs/*.txt))
 
 %:
-	dh $@ --builddirectory=_build --buildsystem=golang
+	dh $@
+
+override_dh_auto_build:
+	go build -trimpath -buildmode=pie -ldflags="-compressdwarf=false -X github.com/foxboron/sbctl.Version=$(shell dpkg-parsechangelog -S Version)" -o sbctl ./cmd/sbctl
+	make $(MANS)
+	# from Makefile, with proper perms
+	./sbctl completion bash | install -m644 -D /dev/stdin contrib/completions/bash-completion/completions/sbctl
+	./sbctl completion zsh | install -m644 -D /dev/stdin contrib/completions/zsh/site-functions/_sbctl
+	./sbctl completion fish | install -m644 -D /dev/stdin contrib/completions/fish/vendor_completions.d/sbctl.fish
 
 execute_after_dh_auto_build:
-	make $(MANS)
-	# from Makefile, but with _build/bin/sbctl instead, and proper perms
-	_build/bin/sbctl completion bash | install -m644 -D /dev/stdin contrib/completions/bash-completion/completions/sbctl
-	_build/bin/sbctl completion zsh | install -m644 -D /dev/stdin contrib/completions/zsh/site-functions/_sbctl
-	_build/bin/sbctl completion fish | install -m644 -D /dev/stdin contrib/completions/fish/vendor_completions.d/sbctl.fish
+	:
 
 override_dh_auto_install:
-	dh_auto_install -- --no-source
+	install -m755 -D sbctl debian/tmp/usr/bin/sbctl
+
+override_dh_dwz:
+	:
 
 override_dh_auto_test:
 	-dh_auto_test
