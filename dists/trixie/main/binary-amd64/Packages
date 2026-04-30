@@ -1,0 +1,80 @@
+Package: sbctl
+Version: 0.18-1~local1
+Architecture: all
+Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
+Installed-Size: 22
+Depends: sbctl-bin
+Filename: repo/pool/main/sbctl_0.18-1~local1_all.deb
+Size: 4236
+MD5sum: c8572275c00b2742066ce2096845b995
+SHA1: 59d58844aaa62260c02b15a9d42007a2f54a3bf1
+SHA256: 203d2690ad2fec7d6af956c27845b012281a2865bc4a54acf867713791602b3f
+Section: admin
+Priority: optional
+Homepage: https://github.com/foxboron/sbctl
+Description: UEFI Secure Boot key manager (automated setup)
+ sbctl intends to be a user-friendly secure boot key manager capable of
+ setting up secure boot, offer key management capabilities, and keep
+ track of files that needs to be signed in the boot chain.
+ .
+ Features:
+  * User-friendly
+  * Manages secure boot keys
+  * Live enrollment of keys
+  * Signing database to help keep track of files to sign
+  * Verify ESP of files missing signatures
+  * EFI stub generation
+  * JSON output
+ .
+ This package automate using sbctl, see 'sbctl-bin' for binary only.
+
+Package: sbctl-bin
+Source: sbctl
+Version: 0.18-1~local1
+Architecture: amd64
+Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
+Installed-Size: 10372
+Depends: jq, libc6 (>= 2.34), libpcsclite1 (>= 1.0.0)
+Recommends: systemd-boot
+Filename: repo/pool/main/sbctl-bin_0.18-1~local1_amd64.deb
+Size: 2985548
+MD5sum: 1c9d4f160f00541566394d851f1689a5
+SHA1: b0840da49d6256cd1cc3ff256bf1e853fcfd8d5a
+SHA256: 7322308f5e49a40fedd4c23669575b95f3e2a598c0f297644d5fe86dc20ba705
+Section: admin
+Priority: optional
+Homepage: https://github.com/foxboron/sbctl
+Description: UEFI Secure Boot key manager (Go program)
+ sbctl intends to be a user-friendly secure boot key manager capable of
+ setting up secure boot, offer key management capabilities, and keep
+ track of files that needs to be signed in the boot chain.
+ .
+ Features:
+  * User-friendly
+  * Manages secure boot keys
+  * Live enrollment of keys
+  * Signing database to help keep track of files to sign
+  * Verify ESP of files missing signatures
+  * EFI stub generation
+  * JSON output
+ .
+ This package contains the 'sbctl' tool.
+
+Package: sbctl-bin-dbgsym
+Source: sbctl
+Version: 0.18-1~local1
+Auto-Built-Package: debug-symbols
+Architecture: amd64
+Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
+Installed-Size: 4983
+Depends: sbctl-bin (= 0.18-1~local1)
+Filename: repo/pool/main/sbctl-bin-dbgsym_0.18-1~local1_amd64.deb
+Size: 3368860
+MD5sum: d16cfd8dfb7788397e5b0be310e2e353
+SHA1: 368ab2e9308bae553bf152b0dc526e5300841913
+SHA256: b8dc8c87822162f66794b11d49397bdaa4ba9022c7f0beb9a5b0a2f137f7846e
+Section: debug
+Priority: optional
+Description: debug symbols for sbctl-bin
+Build-Ids: 4323bc2db8e82c4dc742bac5a07bc63dab960a39
+
