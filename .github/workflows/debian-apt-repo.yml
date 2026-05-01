@@ -111,6 +111,7 @@ jobs:
           APT_GPG_PUBLIC_KEY: ${{ secrets.APT_GPG_PUBLIC_KEY }}
         run: |
           set -eu
+
           mkdir -p repo/pool/main repo/dists/trixie/main/binary-amd64
           cp artifacts/sbctl_*_all.deb repo/pool/main/
           cp artifacts/sbctl-bin_*_amd64.deb repo/pool/main/
@@ -172,26 +173,30 @@ jobs:
             <p>Suite: <code>trixie</code>, Component: <code>main</code>, Architecture: <code>amd64</code>.</p>
             <h2>Install</h2>
             <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
-            curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | sudo tee /etc/apt/keyrings/sbctl-archive-keyring.gpg >/dev/null
-            cat <<'EOF' | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
-            Types: deb
-            URIs: https://adamcik.github.io/sbctl-debian
-            Suites: trixie
-            Components: main
-            Architectures: amd64
-            Signed-By: /etc/apt/keyrings/sbctl-archive-keyring.gpg
-            EOF
-            cat <<'EOF' | sudo tee /etc/apt/preferences.d/sbctl.pref >/dev/null
-            Package: sbctl sbctl-bin
-            Pin: origin adamcik.github.io
-            Pin-Priority: 700
 
-            Package: *
-            Pin: origin adamcik.github.io
-            Pin-Priority: -1
-            EOF
-            sudo apt update
-            sudo apt install sbctl</code></pre>
+          curl -fsSL https://adamcik.github.io/sbctl-debian/sbctl-archive-keyring.gpg | sudo tee /etc/apt/keyrings/sbctl-archive-keyring.gpg >/dev/null
+
+          cat <<'EOF' | sudo tee /etc/apt/sources.list.d/sbctl.sources >/dev/null
+          Types: deb
+          URIs: https://adamcik.github.io/sbctl-debian
+          Suites: trixie
+          Components: main
+          Architectures: amd64
+          Signed-By: /etc/apt/keyrings/sbctl-archive-keyring.gpg
+          EOF
+
+          cat <<'EOF' | sudo tee /etc/apt/preferences.d/sbctl.pref >/dev/null
+          Package: sbctl sbctl-bin
+          Pin: origin adamcik.github.io
+          Pin-Priority: 700
+
+          Package: *
+          Pin: origin adamcik.github.io
+          Pin-Priority: -1
+          EOF
+
+          sudo apt update
+          sudo apt install sbctl</code></pre>
           </body>
           </html>
           HTML
@@ -209,13 +214,16 @@ jobs:
     runs-on: ubuntu-latest
     needs: publish
     if: github.ref == 'refs/heads/trixie'
+
     permissions:
       contents: read
       pages: write
       id-token: write
+
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
