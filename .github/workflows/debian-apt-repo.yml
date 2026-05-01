@@ -116,7 +116,13 @@ jobs:
           cp artifacts/sbctl_*_all.deb repo/pool/main/
           cp artifacts/sbctl-bin_*_amd64.deb repo/pool/main/
 
-          dpkg-scanpackages --arch amd64 repo/pool > repo/dists/trixie/main/binary-amd64/Packages
+          (cd repo && dpkg-scanpackages --arch amd64 pool > dists/trixie/main/binary-amd64/Packages)
+
+          if grep -q '^Filename: repo/' repo/dists/trixie/main/binary-amd64/Packages; then
+            echo "Invalid Packages index: Filename entries must not start with repo/" >&2
+            exit 1
+          fi
+
           gzip -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.gz
           xz -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.xz
 
