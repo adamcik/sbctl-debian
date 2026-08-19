@@ -1,0 +1,83 @@
+name: Sync upstream sbctl release
+
+on:
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout trixie
+        uses: actions/checkout@v4
+        with:
+          ref: trixie
+          fetch-depth: 0
+
+      - name: Select newest stable upstream release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "tag=$(.github/scripts/sync-upstream-release.sh latest)" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether a sync is needed
+        id: needed
+        run: echo "value=$(.github/scripts/sync-upstream-release.sh needs-sync '${{ steps.release.outputs.tag }}')" >> "$GITHUB_OUTPUT"
+
+      - name: Install changelog tooling
+        if: steps.needed.outputs.value == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends devscripts
+
+      - name: Configure Git identity
+        if: steps.needed.outputs.value == 'true'
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+      - name: Prepare tagged upstream merge
+        id: prepare
+        if: steps.needed.outputs.value == 'true'
+        env:
+          DEBFULLNAME: sbctl-debian sync
+          DEBEMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          branch="sync/upstream-${{ steps.release.outputs.tag }}"
+          git switch -C "$branch" origin/trixie
+          .github/scripts/sync-upstream-release.sh prepare '${{ steps.release.outputs.tag }}'
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          if [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/trixie)" ]]; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push sync branch
+        if: steps.needed.outputs.value == 'true' && steps.prepare.outputs.changed == 'true'
+        run: git push --force-with-lease --set-upstream origin '${{ steps.prepare.outputs.branch }}'
+
+      - name: Create or update sync pull request
+        if: steps.needed.outputs.value == 'true' && steps.prepare.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.prepare.outputs.branch }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh pr list --head "$BRANCH" --base trixie --state open --json number --jq 'length == 0' | grep -qx true; then
+            gh pr create --base trixie --head "$BRANCH" \
+              --title "Sync upstream sbctl ${TAG}" \
+              --body "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local."
+          fi
+
+      - name: Dispatch Debian package build for sync branch
+        if: steps.needed.outputs.value == 'true' && steps.prepare.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run debian-apt-repo.yml --ref '${{ steps.prepare.outputs.branch }}'
