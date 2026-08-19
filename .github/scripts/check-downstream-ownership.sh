@@ -9,7 +9,7 @@ die() {
 
 is_locally_owned() {
   case "$1" in
-    debian/*|BUILDING.md|.github/workflows/debian-apt-repo.yml|.github/workflows/sync-upstream.yml|.github/scripts/*|.github/upstream-release)
+    debian/*|BUILDING.md|renovate.json|.github/workflows/debian-apt-repo.yml|.github/workflows/sync-upstream.yml|.github/scripts/*|.github/upstream-release)
       return 0
       ;;
     *)
@@ -29,7 +29,7 @@ require_local_only() {
   if ((${#invalid[@]})); then
     printf 'Downstream commits modified upstream-owned files:\n' >&2
     printf '  %s\n' "${invalid[@]}" >&2
-    die 'Only debian/**, BUILDING.md, and the sync/package workflow files are locally maintained.'
+    die 'Only debian/**, BUILDING.md, renovate.json, and the sync/package workflow files are locally maintained.'
   fi
 }
 
