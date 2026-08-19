@@ -71,10 +71,11 @@ leading `v` from upstream tags.
 Locally maintained paths are `debian/**`, this file,
 `.github/workflows/debian-apt-repo.yml`,
 `.github/workflows/sync-upstream.yml`, `.github/scripts/**`, and
-`.github/upstream-release`. The ownership job rejects ordinary pull requests
-that modify other paths. A sync PR may modify upstream-owned paths only through
-its tagged upstream merge; its follow-up Debian version and metadata changes
-remain within the local boundary.
+`.github/upstream-release`, and `renovate.json`. Renovate is limited to the
+two locally maintained workflow files. The ownership job rejects ordinary pull
+requests that modify other paths. A sync PR may modify upstream-owned paths
+only through its tagged upstream merge; its follow-up Debian version and
+metadata changes remain within the local boundary.
 
 ### Required GitHub environment
 
