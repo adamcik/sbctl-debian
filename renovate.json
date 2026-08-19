@@ -1,6 +1,10 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "local>adamcik/renovate-config"
+    "github>adamcik/renovate-config:application"
+  ],
+  "includePaths": [
+    ".github/workflows/debian-apt-repo.yml",
+    ".github/workflows/sync-upstream.yml"
   ]
 }
