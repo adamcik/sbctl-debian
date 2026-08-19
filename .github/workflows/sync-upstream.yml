@@ -70,8 +70,8 @@ jobs:
           BRANCH: ${{ steps.prepare.outputs.branch }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
-          if gh pr list --head "$BRANCH" --base trixie --state open --json number --jq 'length == 0' | grep -qx true; then
-            gh pr create --base trixie --head "$BRANCH" \
+          if gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base trixie --state open --json number --jq 'length == 0' | grep -qx true; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --base trixie --head "$BRANCH" \
               --title "Sync upstream sbctl ${TAG}" \
               --body "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local."
           fi
@@ -80,4 +80,4 @@ jobs:
         if: steps.needed.outputs.value == 'true' && steps.prepare.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run debian-apt-repo.yml --ref '${{ steps.prepare.outputs.branch }}'
+        run: gh workflow run debian-apt-repo.yml --repo "$GITHUB_REPOSITORY" --ref '${{ steps.prepare.outputs.branch }}'
