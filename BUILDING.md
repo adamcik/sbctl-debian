@@ -48,9 +48,33 @@ sbctl status
 The repository includes a GitHub Actions workflow at
 `.github/workflows/debian-apt-repo.yml` that:
 
-1. Builds trixie `.deb` artifacts from this branch.
+1. Builds trixie `.deb` artifacts for every pull request and `trixie` push.
 2. Creates and signs an APT repository structure.
 3. Publishes it to the `gh-pages` branch.
+
+## Upstream sync and ownership
+
+`.github/workflows/sync-upstream.yml` polls the newest stable
+`Foxboron/sbctl` GitHub release weekly and can also be run manually. It creates
+or updates a `sync/upstream-<tag>` pull request; it never merges that pull
+request. The workflow fetches and merges the immutable upstream tag, and a
+merge conflict fails the run for manual resolution. A sync PR dispatches the
+Debian build workflow, but only a push to `trixie` can sign and publish the APT
+repository.
+
+The initial `0.18` import has no shared Git ancestry with upstream. The first
+sync run creates a reviewed, tree-preserving ancestry baseline for that tag.
+Later release updates use ordinary Git merges. The sync helper updates the
+first `debian/changelog` entry to `<upstream-version>-1~local1`, stripping a
+leading `v` from upstream tags.
+
+Locally maintained paths are `debian/**`, this file,
+`.github/workflows/debian-apt-repo.yml`,
+`.github/workflows/sync-upstream.yml`, `.github/scripts/**`, and
+`.github/upstream-release`. The ownership job rejects ordinary pull requests
+that modify other paths. A sync PR may modify upstream-owned paths only through
+its tagged upstream merge; its follow-up Debian version and metadata changes
+remain within the local boundary.
 
 ### Required GitHub environment
 

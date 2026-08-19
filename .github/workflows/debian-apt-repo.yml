@@ -2,23 +2,43 @@ name: Build Debian package and publish APT repo
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - trixie
   push:
     branches:
       - trixie
-    paths:
-      - 'debian/**'
-      - '.github/workflows/debian-apt-repo.yml'
-      - 'BUILDING.md'
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 jobs:
+  ownership:
+    name: Verify downstream ownership boundary
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout PR head
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Verify changed paths and upstream merge provenance
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          .github/scripts/check-downstream-ownership.sh \
+            '${{ github.event.pull_request.base.sha || github.event.before }}' \
+            '${{ github.event.pull_request.head.sha || github.sha }}'
+
   build:
     name: Build trixie .deb artifacts
     runs-on: ubuntu-latest
+    needs: ownership
+    permissions:
+      contents: read
     container:
       image: debian:trixie
     steps:
@@ -61,11 +81,13 @@ jobs:
     name: Prepare signed APT repository artifact for Pages
     runs-on: ubuntu-latest
     needs: build
-    if: github.ref == 'refs/heads/trixie'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/trixie'
     environment:
       name: apt-signing
     permissions:
       contents: read
+      pages: write
+      id-token: write
     steps:
       - name: Install repository tooling
         run: |
@@ -219,7 +241,7 @@ jobs:
     name: Deploy Pages
     runs-on: ubuntu-latest
     needs: publish
-    if: github.ref == 'refs/heads/trixie'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/trixie'
 
     permissions:
       contents: read
