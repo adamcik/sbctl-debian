@@ -20,6 +20,16 @@ jobs:
           ref: trixie
           fetch-depth: 0
 
+      - name: Verify safe merge settings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          settings="$(gh api "repos/$GITHUB_REPOSITORY" --jq '[.allow_merge_commit, .allow_squash_merge, .allow_rebase_merge] | @tsv')"
+          if [[ "$settings" != $'true\tfalse\tfalse' ]]; then
+            echo 'Enable merge commits and disable squash and rebase merges.' >&2
+            exit 1
+          fi
+
       - name: Select newest stable upstream release
         id: release
         env:
@@ -50,9 +60,11 @@ jobs:
           DEBEMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           branch="sync/upstream-${{ steps.release.outputs.tag }}"
+          from_tag="$(awk -F= '$1 == "tag" { print $2 }' .github/upstream-release)"
           git switch -C "$branch" origin/trixie
           .github/scripts/sync-upstream-release.sh prepare '${{ steps.release.outputs.tag }}'
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "from_tag=$from_tag" >> "$GITHUB_OUTPUT"
           if [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/trixie)" ]]; then
             echo 'changed=false' >> "$GITHUB_OUTPUT"
           else
@@ -68,12 +80,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ steps.prepare.outputs.branch }}
+          FROM_TAG: ${{ steps.prepare.outputs.from_tag }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           if gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base trixie --state open --json number --jq 'length == 0' | grep -qx true; then
             gh pr create --repo "$GITHUB_REPOSITORY" --base trixie --head "$BRANCH" \
               --title "Sync upstream sbctl ${TAG}" \
-              --body "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local."
+              --body "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local.
+
+Upstream changes: https://github.com/Foxboron/sbctl/compare/${FROM_TAG}...${TAG}
+
+Merge this pull request with a merge commit to preserve upstream ancestry."
           fi
 
       - name: Dispatch Debian package build for sync branch

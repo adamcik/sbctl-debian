@@ -62,6 +62,12 @@ merge conflict fails the run for manual resolution. A sync PR dispatches the
 Debian build workflow, but only a push to `trixie` can sign and publish the APT
 repository.
 
+The repository must allow merge commits and disable squash and rebase merges.
+The sync workflow verifies these settings because a merge commit preserves the
+upstream ancestry without copying upstream messages into a new commit. The sync
+pull request links to the upstream compare view instead; copied issue links can
+create cross-repository backlinks and notifications.
+
 The initial `0.18` import has no shared Git ancestry with upstream. The first
 sync run creates a reviewed, tree-preserving ancestry baseline for that tag.
 Later release updates use ordinary Git merges. The sync helper updates the
