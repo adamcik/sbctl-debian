@@ -84,13 +84,13 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           if gh pr list --repo "$GITHUB_REPOSITORY" --head "$BRANCH" --base trixie --state open --json number --jq 'length == 0' | grep -qx true; then
+            body="$(printf '%s\n\n%s\n\n%s' \
+              "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local." \
+              "Upstream changes: https://github.com/Foxboron/sbctl/compare/${FROM_TAG}...${TAG}" \
+              'Merge this pull request with a merge commit to preserve upstream ancestry.')"
             gh pr create --repo "$GITHUB_REPOSITORY" --base trixie --head "$BRANCH" \
               --title "Sync upstream sbctl ${TAG}" \
-              --body "Sync the immutable upstream release tag \`${TAG}\`. Debian packaging remains local.
-
-Upstream changes: https://github.com/Foxboron/sbctl/compare/${FROM_TAG}...${TAG}
-
-Merge this pull request with a merge commit to preserve upstream ancestry."
+              --body "$body"
           fi
 
       - name: Dispatch Debian package build for sync branch
