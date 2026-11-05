@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Checkout PR head
         if: github.event_name != 'workflow_dispatch'
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
@@ -58,7 +58,7 @@ jobs:
             pkgconf
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Build packages
         run: dpkg-buildpackage -us -uc -b -nc
