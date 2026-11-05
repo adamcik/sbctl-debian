@@ -74,8 +74,8 @@ The repository includes a GitHub Actions workflow at
    APT install check against that exact repository before uploading the Pages
    artifact. A separate dependent job deploys it to GitHub Pages, not a branch.
 
-Both signing paths use `.github/scripts/build-apt-repository.sh`. The install
-checks use `.github/scripts/verify-debian-install.sh`, with `/artifacts` and
+Both signing paths use `.github/scripts/debian-build-apt-repository.sh`. The install
+checks use `.github/scripts/debian-smoke-test.sh`, with `/artifacts` and
 `/repo` mounted read-only. Run this script only in disposable trixie containers:
 installing `sbctl` can create local Secure Boot keys. The checks do not mount
 host firmware or boot filesystems and do not test real key enrollment, boot
@@ -83,7 +83,7 @@ signing, or firmware behavior. They need neither signing secrets nor hardware.
 
 ## Upstream sync and ownership
 
-`.github/workflows/sync-upstream.yml` polls the newest stable
+`.github/workflows/debian-sync-upstream.yml` polls the newest stable
 `Foxboron/sbctl` GitHub release weekly and can also be run manually. It creates
 or updates a `sync/upstream-<tag>` pull request; it never merges that pull
 request. The workflow fetches and merges the immutable upstream tag, and a
@@ -114,14 +114,20 @@ Later release updates use ordinary Git merges. The sync helper updates the
 first `debian/changelog` entry to `<upstream-version>-1~local1`, stripping a
 leading `v` from upstream tags.
 
-Locally maintained paths are `debian/**`, this file,
-`.github/workflows/debian-apt-repo.yml`,
-`.github/workflows/sync-upstream.yml`, `.github/scripts/**`, and
-`.github/upstream-release`, and `renovate.json`. Renovate is limited to the
+Locally maintained paths are `debian/**`, this file, `renovate.json`,
+`.github/workflows/debian-*.yml`, `.github/scripts/debian-*.sh`, and
+`.github/debian-upstream-release`. Renovate is limited to the
 two locally maintained workflow files. The ownership job rejects ordinary pull
 requests that modify other paths. A sync PR may modify upstream-owned paths
 only through its tagged upstream merge; its follow-up Debian version and
 metadata changes remain within the local boundary.
+
+Downstream GitHub automation uses the `debian-` filename prefix and the
+`Debian: …` workflow display prefix to distinguish it from mirrored upstream
+automation and avoid filename collisions during syncs. Standard `debian/**`
+filenames and this document keep their names. Required-check job names stay
+stable when workflows are renamed. The ownership check permits deleting the
+former downstream names during migration, but rejects recreating them.
 
 ### Required GitHub environment
 

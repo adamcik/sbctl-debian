@@ -6,7 +6,7 @@
 set -euo pipefail
 
 [[ $# -eq 1 && ( "$1" == deb || "$1" == apt ) ]] || {
-  echo 'Usage: verify-debian-install.sh {deb|apt} (mount /artifacts and /repo)' >&2
+  echo 'Usage: debian-smoke-test.sh {deb|apt} (mount /artifacts and /repo)' >&2
   exit 1
 }
 export DEBIAN_FRONTEND=noninteractive

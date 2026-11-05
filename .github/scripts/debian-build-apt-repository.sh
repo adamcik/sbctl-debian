@@ -4,7 +4,7 @@
 # without exposing the release signing key or testing a separate implementation.
 set -euo pipefail
 
-[[ $# -eq 2 ]] || { echo 'Usage: build-apt-repository.sh <artifacts> <repo>' >&2; exit 1; }
+[[ $# -eq 2 ]] || { echo 'Usage: debian-build-apt-repository.sh <artifacts> <repo>' >&2; exit 1; }
 artifacts="$1"
 repo="$2"
 : "${APT_GPG_KEY_ID:?Missing signing key ID}"

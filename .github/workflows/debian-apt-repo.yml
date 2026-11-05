@@ -1,4 +1,4 @@
-name: Build Debian package and publish APT repo
+name: 'Debian: Build packages and publish APT repo'
 
 on:
   workflow_dispatch:
@@ -24,6 +24,9 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
+      - name: Test downstream ownership boundary
+        run: .github/scripts/debian-test-ownership.sh
+
       - name: Verify changed paths and upstream merge provenance
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -35,7 +38,7 @@ jobs:
           if [ "$EVENT_NAME" = workflow_dispatch ]; then
             BASE_SHA="$(git rev-parse origin/trixie)"
           fi
-          .github/scripts/check-downstream-ownership.sh \
+          .github/scripts/debian-check-ownership.sh \
             "$BASE_SHA" "$HEAD_SHA"
 
   build:
@@ -115,18 +118,18 @@ jobs:
           APT_GPG_KEY_ID="$(gpg --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
           APT_GPG_PUBLIC_KEY="$(gpg --armor --export "$APT_GPG_KEY_ID")"
           export APT_GPG_KEY_ID APT_GPG_PUBLIC_KEY
-          bash .github/scripts/build-apt-repository.sh artifacts repo
+          bash .github/scripts/debian-build-apt-repository.sh artifacts repo
 
       - name: Install artifacts in clean trixie
         run: |
           docker run --rm -v "$PWD/artifacts:/artifacts:ro" \
-            -v "$PWD/.github/scripts/verify-debian-install.sh:/verify.sh:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
             debian:trixie bash /verify.sh deb
 
       - name: Consume throwaway-key-signed repository in clean trixie
         run: |
           docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/repo:/repo:ro" \
-            -v "$PWD/.github/scripts/verify-debian-install.sh:/verify.sh:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
             debian:trixie bash /verify.sh apt
 
       - name: Reject repository with invalid signature
@@ -134,7 +137,7 @@ jobs:
           cp -a repo tampered-repo
           sed -i 's/Origin: Thomas Adamcik/Origin: Tampered/' tampered-repo/dists/trixie/InRelease
           if docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/tampered-repo:/repo:ro" \
-            -v "$PWD/.github/scripts/verify-debian-install.sh:/verify.sh:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
             debian:trixie bash /verify.sh apt > signature-check.log 2>&1; then
             echo 'APT accepted a repository with an invalid signature.' >&2
             exit 1
@@ -189,7 +192,7 @@ jobs:
         run: |
           set -eu
 
-          bash .github/scripts/build-apt-repository.sh artifacts repo
+          bash .github/scripts/debian-build-apt-repository.sh artifacts repo
 
           printf '%s\n' \
             'Types: deb' \
@@ -259,7 +262,7 @@ jobs:
       - name: Consume release-signed repository before upload
         run: |
           docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/repo:/repo:ro" \
-            -v "$PWD/.github/scripts/verify-debian-install.sh:/verify.sh:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
             debian:trixie bash /verify.sh apt
 
       - name: Remove signing key material
