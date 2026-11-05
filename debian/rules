@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
-# * "tests" requires github.com/anatol/vmtest which would not be very practical
-#   to run at build time.
+# The integration-tagged VM suite needs QEMU/KVM and an OVMF Secure Boot image.
+# The default make test target runs the non-VM tests, including the TPM simulator.
 export DH_GOLANG_EXCLUDES := tests/
 
 export DH_GOLANG_INSTALL_EXTRA := certs/microsoft/
@@ -29,7 +29,7 @@ override_dh_dwz:
 	:
 
 override_dh_auto_test:
-	-dh_auto_test
+	dh_auto_test
 
 execute_after_dh_auto_clean:
 	make clean

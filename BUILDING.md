@@ -12,6 +12,7 @@ sudo apt install --no-install-recommends \
   asciidoc-base \
   golang-any \
   libpcsclite-dev \
+  libssl-dev \
   pkgconf \
   debhelper \
   devscripts
@@ -29,6 +30,13 @@ Notes:
 - `-nc` skips the `clean` step and avoids permission issues if previous builds
   left read-only files under `debian/.debhelper`.
 - Generated packages are placed in the parent directory.
+- `dh_auto_test` runs the upstream `make test` target (`go test -v ./...`).
+  Any failure stops the package build. `libssl-dev` supplies the headers needed
+  by the command tests' software TPM simulator; these tests do not need a TPM.
+- The separate upstream `make integration` suite is not run during the Debian
+  build. Its `integration` build tag requires a QEMU/KVM VM and an OVMF Secure
+  Boot image (see `tests/README.md`), which the build container does not provide.
+  The default Go tests remain enabled, including the command tests.
 
 ## Install locally
 

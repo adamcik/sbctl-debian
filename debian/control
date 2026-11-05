@@ -11,6 +11,7 @@ Build-Depends:
  asciidoc-base,
  golang-any,
  libpcsclite-dev,
+ libssl-dev <!nocheck>,
  pkgconf,
 Testsuite: autopkgtest-pkg-go
 Standards-Version: 4.7.2

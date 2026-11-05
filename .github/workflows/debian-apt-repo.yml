@@ -55,6 +55,7 @@ jobs:
             asciidoc-base \
             golang-any \
             libpcsclite-dev \
+            libssl-dev \
             pkgconf
 
       - name: Checkout
