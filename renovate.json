@@ -5,6 +5,6 @@
   ],
   "includePaths": [
     ".github/workflows/debian-apt-repo.yml",
-    ".github/workflows/sync-upstream.yml"
+    ".github/workflows/debian-sync-upstream.yml"
   ]
 }

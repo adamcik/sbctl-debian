@@ -1,4 +1,4 @@
-name: Sync upstream sbctl release
+name: 'Debian: Sync upstream sbctl release'
 
 on:
   schedule:
@@ -34,11 +34,11 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: echo "tag=$(.github/scripts/sync-upstream-release.sh latest)" >> "$GITHUB_OUTPUT"
+        run: echo "tag=$(.github/scripts/debian-sync-upstream.sh latest)" >> "$GITHUB_OUTPUT"
 
       - name: Check whether a sync is needed
         id: needed
-        run: echo "value=$(.github/scripts/sync-upstream-release.sh needs-sync '${{ steps.release.outputs.tag }}')" >> "$GITHUB_OUTPUT"
+        run: echo "value=$(.github/scripts/debian-sync-upstream.sh needs-sync '${{ steps.release.outputs.tag }}')" >> "$GITHUB_OUTPUT"
 
       - name: Install changelog tooling
         if: steps.needed.outputs.value == 'true'
@@ -60,9 +60,9 @@ jobs:
           DEBEMAIL: 41898282+github-actions[bot]@users.noreply.github.com
         run: |
           branch="sync/upstream-${{ steps.release.outputs.tag }}"
-          from_tag="$(awk -F= '$1 == "tag" { print $2 }' .github/upstream-release)"
+          from_tag="$(awk -F= '$1 == "tag" { print $2 }' .github/debian-upstream-release)"
           git switch -C "$branch" origin/trixie
-          .github/scripts/sync-upstream-release.sh prepare '${{ steps.release.outputs.tag }}'
+          .github/scripts/debian-sync-upstream.sh prepare '${{ steps.release.outputs.tag }}'
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "from_tag=$from_tag" >> "$GITHUB_OUTPUT"
           if [[ "$(git rev-parse HEAD)" == "$(git rev-parse origin/trixie)" ]]; then

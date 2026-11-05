@@ -4,7 +4,7 @@ set -euo pipefail
 
 readonly UPSTREAM_REPOSITORY='https://github.com/Foxboron/sbctl.git'
 readonly UPSTREAM_REMOTE='upstream'
-readonly RELEASE_FILE='.github/upstream-release'
+readonly RELEASE_FILE='.github/debian-upstream-release'
 
 die() {
   printf '%s\n' "$*" >&2
@@ -120,14 +120,14 @@ case "${1:-}" in
     latest_tag
     ;;
   needs-sync)
-    [[ $# -eq 2 ]] || die 'Usage: sync-upstream-release.sh needs-sync <tag>'
+    [[ $# -eq 2 ]] || die 'Usage: debian-sync-upstream.sh needs-sync <tag>'
     needs_sync "$2"
     ;;
   prepare)
-    [[ $# -eq 2 ]] || die 'Usage: sync-upstream-release.sh prepare <tag>'
+    [[ $# -eq 2 ]] || die 'Usage: debian-sync-upstream.sh prepare <tag>'
     prepare "$2"
     ;;
   *)
-    die 'Usage: sync-upstream-release.sh {latest|needs-sync <tag>|prepare <tag>}'
+    die 'Usage: debian-sync-upstream.sh {latest|needs-sync <tag>|prepare <tag>}'
     ;;
 esac

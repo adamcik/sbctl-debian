@@ -1,10 +1,9 @@
-name: Build Debian package and publish APT repo
+name: 'Debian: Build packages and publish APT repo'
 
 on:
   workflow_dispatch:
+  # Stacked packaging PRs target another task branch before they target trixie.
   pull_request:
-    branches:
-      - trixie
   push:
     branches:
       - trixie
@@ -19,19 +18,28 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout PR head
-        if: github.event_name != 'workflow_dispatch'
+      - name: Checkout PR or dispatched head
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
+      - name: Test downstream ownership boundary
+        run: .github/scripts/debian-test-ownership.sh
+
       - name: Verify changed paths and upstream merge provenance
-        if: github.event_name != 'workflow_dispatch'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          .github/scripts/check-downstream-ownership.sh \
-            '${{ github.event.pull_request.base.sha || github.event.before }}' \
-            '${{ github.event.pull_request.head.sha || github.sha }}'
+          # GITHUB_TOKEN-created sync PRs dispatch this workflow explicitly.
+          # Check their delta against trixie instead of skipping ownership.
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            BASE_SHA="$(git rev-parse origin/trixie)"
+          fi
+          .github/scripts/debian-check-ownership.sh \
+            "$BASE_SHA" "$HEAD_SHA"
 
   build:
     name: Build trixie .deb artifacts
@@ -55,6 +63,7 @@ jobs:
             asciidoc-base \
             golang-any \
             libpcsclite-dev \
+            libssl-dev \
             pkgconf
 
       - name: Checkout
@@ -72,15 +81,76 @@ jobs:
           cp ../*.buildinfo artifacts/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: debian-packages
           path: artifacts/
 
-  publish:
-    name: Prepare signed APT repository artifact for Pages
+  verify:
+    # PRs (including dispatched upstream-sync builds) use a throwaway key.
+    # Never expose the release signing secrets to this unreviewed code.
+    name: Verify Debian packages and signed APT repository
     runs-on: ubuntu-latest
     needs: build
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Download built artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: debian-packages
+          path: artifacts
+
+      - name: Install repository tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils xz-utils gzip gnupg
+
+      - name: Build test repository with throwaway key (no release secrets)
+        run: |
+          GNUPGHOME="$(mktemp -d)"
+          export GNUPGHOME
+          trap 'gpgconf --kill all; rm -r "$GNUPGHOME"' EXIT
+          gpg --batch --passphrase '' --quick-generate-key 'Package CI <ci@example.invalid>' rsa2048 sign 1d
+          APT_GPG_KEY_ID="$(gpg --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          APT_GPG_PUBLIC_KEY="$(gpg --armor --export "$APT_GPG_KEY_ID")"
+          export APT_GPG_KEY_ID APT_GPG_PUBLIC_KEY
+          bash .github/scripts/debian-build-apt-repository.sh artifacts repo
+
+      - name: Install artifacts in clean trixie
+        run: |
+          docker run --rm -v "$PWD/artifacts:/artifacts:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
+            debian:trixie bash /verify.sh deb
+
+      - name: Consume throwaway-key-signed repository in clean trixie
+        run: |
+          docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/repo:/repo:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
+            debian:trixie bash /verify.sh apt
+
+      - name: Reject repository with invalid signature
+        run: |
+          cp -a repo tampered-repo
+          sed -i 's/Origin: Thomas Adamcik/Origin: Tampered/' tampered-repo/dists/trixie/InRelease
+          if docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/tampered-repo:/repo:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
+            debian:trixie bash /verify.sh apt > signature-check.log 2>&1; then
+            echo 'APT accepted a repository with an invalid signature.' >&2
+            exit 1
+          fi
+          cat signature-check.log
+          grep -E 'BADSIG|Bad signature|Message has been manipulated' signature-check.log
+
+  publish:
+    # Only reviewed trixie pushes use the production key. Test that signed
+    # repository before uploading it for the dependent deployment job.
+    name: Prepare signed APT repository artifact for Pages
+    runs-on: ubuntu-latest
+    needs: verify
     if: github.event_name == 'push' && github.ref == 'refs/heads/trixie'
     environment:
       name: apt-signing
@@ -89,31 +159,19 @@ jobs:
       pages: write
       id-token: write
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
       - name: Install repository tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends dpkg-dev apt-utils xz-utils gzip gnupg
 
       - name: Download built artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: debian-packages
           path: artifacts
-
-      - name: Enforce publish allowlist
-        run: |
-          set -eu
-          for file in artifacts/*.deb; do
-            base="$(basename "$file")"
-            case "$base" in
-              sbctl_*_all.deb|sbctl-bin_*_amd64.deb)
-                ;;
-              *)
-                echo "Unexpected package in artifacts: $base" >&2
-                exit 1
-                ;;
-            esac
-          done
 
       - name: Import APT signing key
         env:
@@ -123,9 +181,9 @@ jobs:
           set -eu
           GNUPGHOME="$(mktemp -d)"
           export GNUPGHOME
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
           printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --import
           gpg --batch --list-secret-keys "$APT_GPG_KEY_ID"
-          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
 
       - name: Build repository structure
         env:
@@ -134,35 +192,7 @@ jobs:
         run: |
           set -eu
 
-          mkdir -p repo/pool/main repo/dists/trixie/main/binary-amd64
-          cp artifacts/sbctl_*_all.deb repo/pool/main/
-          cp artifacts/sbctl-bin_*_amd64.deb repo/pool/main/
-
-          (cd repo && dpkg-scanpackages --arch amd64 pool > dists/trixie/main/binary-amd64/Packages)
-
-          if grep -q '^Filename: repo/' repo/dists/trixie/main/binary-amd64/Packages; then
-            echo "Invalid Packages index: Filename entries must not start with repo/" >&2
-            exit 1
-          fi
-
-          gzip -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.gz
-          xz -9c repo/dists/trixie/main/binary-amd64/Packages > repo/dists/trixie/main/binary-amd64/Packages.xz
-
-          apt-ftparchive \
-            -o APT::FTPArchive::Release::Origin="Thomas Adamcik" \
-            -o APT::FTPArchive::Release::Label="sbctl-debian" \
-            -o APT::FTPArchive::Release::Suite="trixie" \
-            -o APT::FTPArchive::Release::Codename="trixie" \
-            -o APT::FTPArchive::Release::Architectures="amd64" \
-            -o APT::FTPArchive::Release::Components="main" \
-            -o APT::FTPArchive::Release::Description="sbctl Debian packages" \
-            release repo/dists/trixie > repo/dists/trixie/Release
-
-          gpg --batch --yes --pinentry-mode loopback --default-key "$APT_GPG_KEY_ID" --clearsign -o repo/dists/trixie/InRelease repo/dists/trixie/Release
-          gpg --batch --yes --pinentry-mode loopback --default-key "$APT_GPG_KEY_ID" -abs -o repo/dists/trixie/Release.gpg repo/dists/trixie/Release
-
-          printf '%s' "$APT_GPG_PUBLIC_KEY" | gpg --batch --dearmor -o repo/sbctl-archive-keyring.gpg
-          printf '%s\n' "$APT_GPG_PUBLIC_KEY" > repo/sbctl-archive-keyring.asc
+          bash .github/scripts/debian-build-apt-repository.sh artifacts repo
 
           printf '%s\n' \
             'Types: deb' \
@@ -229,11 +259,25 @@ jobs:
           </html>
           HTML
 
+      - name: Consume release-signed repository before upload
+        run: |
+          docker run --rm -v "$PWD/artifacts:/artifacts:ro" -v "$PWD/repo:/repo:ro" \
+            -v "$PWD/.github/scripts/debian-smoke-test.sh:/verify.sh:ro" \
+            debian:trixie bash /verify.sh apt
+
+      - name: Remove signing key material
+        if: always()
+        run: |
+          if [ -n "${GNUPGHOME:-}" ]; then
+            gpgconf --kill all
+            rm -r "$GNUPGHOME"
+          fi
+
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
         with:
           path: ./repo
 
@@ -255,4 +299,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

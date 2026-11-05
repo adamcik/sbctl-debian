@@ -9,7 +9,7 @@ die() {
 
 is_locally_owned() {
   case "$1" in
-    debian/*|BUILDING.md|renovate.json|.github/workflows/debian-apt-repo.yml|.github/workflows/sync-upstream.yml|.github/scripts/*|.github/upstream-release)
+    debian/*|BUILDING.md|renovate.json|.github/workflows/debian-*.yml|.github/scripts/debian-*.sh|.github/debian-upstream-release)
       return 0
       ;;
     *)
@@ -19,33 +19,41 @@ is_locally_owned() {
 }
 
 require_local_only() {
-  local from="$1" to="$2" path
+  local from="$1" to="$2" path status
   local -a invalid=()
 
-  while IFS= read -r path; do
+  while IFS=$'\t' read -r status path; do
+    # Permit removal of the old downstream names, but not their recreation.
+    if [[ "$status" == D ]]; then
+      case "$path" in
+        .github/workflows/sync-upstream.yml|.github/upstream-release|.github/scripts/check-downstream-ownership.sh|.github/scripts/sync-upstream-release.sh|.github/scripts/build-apt-repository.sh|.github/scripts/verify-debian-install.sh)
+          continue
+          ;;
+      esac
+    fi
     is_locally_owned "$path" || invalid+=("$path")
-  done < <(git diff --name-only "$from" "$to")
+  done < <(git diff --name-status --no-renames "$from" "$to")
 
   if ((${#invalid[@]})); then
     printf 'Downstream commits modified upstream-owned files:\n' >&2
     printf '  %s\n' "${invalid[@]}" >&2
-    die 'Only debian/**, BUILDING.md, renovate.json, and the sync/package workflow files are locally maintained.'
+    die 'Only debian/**, BUILDING.md, renovate.json, and debian-namespaced GitHub automation are locally maintained.'
   fi
 }
 
-[[ $# -eq 2 ]] || die 'Usage: check-downstream-ownership.sh <base> <head>'
+[[ $# -eq 2 ]] || die 'Usage: debian-check-ownership.sh <base> <head>'
 base="$1"
 head="$2"
 
 git cat-file -e "${base}^{commit}" || git fetch origin "$base"
 git cat-file -e "${head}^{commit}"
 
-[[ -f .github/upstream-release ]] || die 'Missing .github/upstream-release'
-recorded_tag="$(awk -F= '$1 == "tag" { print $2 }' .github/upstream-release)"
-recorded_commit="$(awk -F= '$1 == "commit" { print $2 }' .github/upstream-release)"
-[[ -n "$recorded_tag" && -n "$recorded_commit" ]] || die 'Invalid .github/upstream-release'
+[[ -f .github/debian-upstream-release ]] || die 'Missing .github/debian-upstream-release'
+recorded_tag="$(awk -F= '$1 == "tag" { print $2 }' .github/debian-upstream-release)"
+recorded_commit="$(awk -F= '$1 == "commit" { print $2 }' .github/debian-upstream-release)"
+[[ -n "$recorded_tag" && -n "$recorded_commit" ]] || die 'Invalid .github/debian-upstream-release'
 [[ "$recorded_tag" =~ ^v?[0-9]+([.][0-9]+){1,2}$ ]] || \
-  die 'Invalid upstream release tag in .github/upstream-release'
+  die 'Invalid upstream release tag in .github/debian-upstream-release'
 
 git fetch --no-tags https://github.com/Foxboron/sbctl.git \
   "refs/tags/${recorded_tag}:refs/tags/ownership-check/${recorded_tag}"
